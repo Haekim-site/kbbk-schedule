@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KBBK Schedule</title>
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #4a4f56;
+    --red: #1a1a1a;
+    --line: rgba(0,0,0,0.35);
+    --line-soft: rgba(0,0,0,0.18);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "SF Pro Display", "Noto Sans KR", sans-serif;
+    background: #000;
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: url('assets/cursor-32.png') 16 16, auto;
+  }
+  button, .dt-trigger, input, select, a {
+    cursor: url('assets/cursor-32.png') 16 16, pointer;
+  }
+  .card {
+    position: relative;
+    aspect-ratio: 481 / 1297;
+    height: min(98vh, calc((100vw - 16px) * 1297 / 481));
+    background: url('assets/plate.png?v=3') center/100% 100% no-repeat;
+    isolation: isolate;
+  }
+  .card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      circle 220px at var(--mx, 50%) var(--my, 50%),
+      rgba(255,255,255,0.35) 0%,
+      rgba(255,255,255,0.10) 30%,
+      rgba(0,0,0,0.10) 65%,
+      transparent 85%
+    );
+    mix-blend-mode: overlay;
+    opacity: var(--sheen, 0);
+    transition: opacity 0.4s ease;
+  }
+  .card:hover::after { opacity: 1; }
+
+  .card-content {
+    position: absolute;
+    top: 26%;
+    bottom: 8%;
+    left: 6%;
+    right: 6%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    z-index: 2;
+  }
+  .card-content > * { min-width: 0; }
+
+  .card-content input[type="text"],
+  .card-content input[type="datetime-local"],
+  .card-content select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  input[type="text"],
+  input[type="number"] {
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    font-size: 13px;
+    background: rgba(255,255,255,0.55);
+    color: var(--ink);
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+  input[type="text"] {
+    background: rgba(255,255,255,0.6);
+  }
+  .dt-trigger {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    font-size: 10px;
+    letter-spacing: -0.02em;
+    background: rgba(255,255,255,0.55);
+    color: var(--ink);
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dt-trigger:hover { border-color: var(--ink); }
+  .dt-trigger.empty { color: var(--muted); }
+
+  /* Custom datetime picker */
+  .dt-picker {
+    position: fixed;
+    z-index: 200;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    width: 240px;
+    font-size: 12px;
+  }
+  .dt-picker[hidden] { display: none; }
+  .dt-cal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .dt-cal-title { font-weight: 700; font-size: 13px; }
+  .dt-nav { display: inline-flex; gap: 4px; }
+  .dt-nav button {
+    width: 22px; height: 22px;
+    border: none; background: transparent;
+    cursor: pointer; border-radius: 4px;
+    font-size: 14px; color: var(--ink);
+  }
+  .dt-nav button:hover { background: rgba(0,0,0,0.06); }
+  .dt-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    padding: 4px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+  .dt-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+  .dt-day {
+    height: 26px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--ink);
+    font-family: inherit;
+    border-radius: 50%;
+    font-variant-numeric: tabular-nums;
+  }
+  .dt-day.other { color: rgba(0,0,0,0.25); }
+  .dt-day:hover { background: rgba(0,0,0,0.06); }
+  .dt-day.selected { background: var(--ink); color: #fff; font-weight: 600; }
+  .dt-day.today { outline: 1px solid var(--ink); outline-offset: -2px; }
+
+  .dt-time {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding-top: 10px;
+    margin-top: 10px;
+    border-top: 1px solid var(--line-soft);
+  }
+  .dt-time select {
+    padding: 5px 6px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 12px;
+    background: rgba(255,255,255,0.85);
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+  }
+  .dt-time-sep { color: var(--muted); font-weight: 700; }
+
+  .dt-footer {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 10px;
+    margin-top: 10px;
+    border-top: 1px solid var(--line-soft);
+  }
+  .dt-footer button {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--ink);
+    padding: 4px 8px;
+    font-family: inherit;
+    border-radius: 4px;
+  }
+  .dt-footer button.primary { background: var(--ink); color: #fff; font-weight: 600; }
+  .dt-footer button:not(.primary):hover { background: rgba(0,0,0,0.06); }
+  input:focus {
+    outline: none;
+    border-color: var(--red);
+    background: rgba(255,255,255,0.85);
+  }
+
+  .section-label {
+    display: block;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    font-weight: 700;
+  }
+
+  .slots {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--line-soft);
+  }
+  .slot {
+    padding: 8px 0;
+    border-top: 1px dashed var(--line-soft);
+    min-width: 0;
+  }
+  .slot:first-child { border-top: none; padding-top: 0; }
+  .slot-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+    min-width: 0;
+  }
+  .slot-head > * { min-width: 0; }
+
+  .toggle {
+    display: inline-flex;
+    min-width: 0;
+    max-width: 100%;
+    border: none;
+    border-radius: 5px;
+    background: none;
+    gap: 2px;
+  }
+  .toggle button {
+    background: transparent;
+    border: none;
+    padding: 4px 8px;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: inherit;
+    transition: color 0.15s, background 0.15s;
+    border-radius: 4px;
+  }
+  .toggle button.active {
+    background: var(--ink);
+    color: #fff;
+    font-weight: 600;
+  }
+  .toggle button:not(.active):hover { color: var(--ink); }
+  .fixed-label {
+    display: inline-block;
+    padding: 0;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    border: none;
+    background: none;
+  }
+
+  .cal-btn {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    background: transparent;
+    color: var(--red);
+    border: 1px solid var(--red);
+    border-radius: 5px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .cal-btn:hover { background: var(--red); color: #fff; }
+  .cal-btn:active { transform: scale(0.94); }
+  .cal-btn.disabled { opacity: 0.3; pointer-events: none; }
+  .cal-btn svg { display: block; }
+
+  .flag {
+    display: inline-block;
+    flex-shrink: 0;
+    font-size: 9px;
+    padding: 0;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    width: 32px;
+    text-align: left;
+    background: none;
+    border: none;
+  }
+  .tz-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    min-width: 0;
+  }
+  .tz-row > * { min-width: 0; }
+
+  .warn {
+    display: inline-block;
+    font-size: 9px;
+    padding: 2px 6px;
+    background: var(--red);
+    color: #fff;
+    border-radius: 3px;
+    margin-bottom: 4px;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+
+  .setting {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 6px;
+    border-top: 1px dashed var(--line-soft);
+    min-width: 0;
+  }
+  .setting-label {
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 0;
+  }
+  .setting-input {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+  .setting-input > * { min-width: 0; }
+  .setting-input input {
+    width: 44px;
+    padding: 4px 6px;
+    font-size: 12px;
+    text-align: right;
+  }
+  .unit {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .action-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .add-all-btn {
+    flex: 1;
+    height: 26px;
+    padding: 0;
+    background: var(--ink);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.15s;
+  }
+  .add-all-btn:hover { opacity: 0.85; }
+  .add-all-btn:active { transform: scale(0.98); }
+  .add-all-btn svg { display: block; }
+  .share-btn {
+    flex: 1;
+    height: 26px;
+    padding: 0;
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+  }
+  .share-btn:hover { background: var(--ink); color: #fff; }
+  .share-btn:active { transform: scale(0.94); }
+  .share-btn svg { display: block; }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 32px;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--ink);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 100;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="card-content">
+    <div>
+      <span class="section-label">Project</span>
+      <input type="text" id="projectName" placeholder="프로젝트건 입력">
+    </div>
+    <div class="slots" id="slots"></div>
+    <div class="action-row">
+      <button type="button" class="share-btn" id="shareBtn" title="스케줄 공유" aria-label="스케줄 공유">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v13"/>
+          <polyline points="7,8 12,3 17,8"/>
+          <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7"/>
+        </svg>
+      </button>
+      <button type="button" class="add-all-btn" id="addAllBtn" title="전체 캘린더 등록" aria-label="전체 캘린더 등록">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="5" width="18" height="16" rx="2"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+          <line x1="8" y1="3" x2="8" y2="7"/>
+          <line x1="16" y1="3" x2="16" y2="7"/>
+          <line x1="8" y1="14" x2="16" y2="14"/>
+          <line x1="8" y1="17" x2="13" y2="17"/>
+        </svg>
+      </button>
+    </div>
+    <div class="setting">
+      <span class="setting-label">학교 블록 (평일 NY)</span>
+      <div class="setting-input">
+        <input type="number" id="schoolStart" min="0" max="23" step="1" value="18">
+        <span class="unit">~</span>
+        <input type="number" id="schoolEnd" min="0" max="23" step="1" value="21">
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<div class="dt-picker" id="dtPicker" hidden>
+  <div class="dt-cal-head">
+    <span class="dt-cal-title" id="dtTitle"></span>
+    <div class="dt-nav">
+      <button type="button" id="dtPrev">‹</button>
+      <button type="button" id="dtNext">›</button>
+    </div>
+  </div>
+  <div class="dt-weekdays">
+    <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+  </div>
+  <div class="dt-days" id="dtDays"></div>
+  <div class="dt-time">
+    <select id="dtHour"></select>
+    <span class="dt-time-sep">:</span>
+    <select id="dtMinute"></select>
+  </div>
+  <div class="dt-footer">
+    <button type="button" id="dtClear">Clear</button>
+    <button type="button" id="dtCancel">Cancel</button>
+    <button type="button" class="primary" id="dtDone">Done</button>
+  </div>
+</div>
+
+<script>
+  const slotsEl = document.getElementById('slots');
+  const projectInput = document.getElementById('projectName');
+  const schoolStart = document.getElementById('schoolStart');
+  const schoolEnd = document.getElementById('schoolEnd');
+
+  const DELIVERY_TYPES = ['Copy', 'Art', 'Final'];
+  const KST_TZ = 'Asia/Seoul';
+  const NY_TZ = 'America/New_York';
+
+  function tzParts(utcDate, tz) {
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    });
+    const parts = {};
+    dtf.formatToParts(utcDate).forEach(p => { parts[p.type] = p.value; });
+    let hour = parseInt(parts.hour, 10);
+    if (hour === 24) hour = 0;
+    return {
+      year: parseInt(parts.year, 10),
+      month: parseInt(parts.month, 10),
+      day: parseInt(parts.day, 10),
+      hour, minute: parseInt(parts.minute, 10), second: parseInt(parts.second, 10),
+    };
+  }
+  function tzOffsetMs(utcDate, tz) {
+    const p = tzParts(utcDate, tz);
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - utcDate.getTime();
+  }
+  function wallToUtc(y, mo, d, h, mi, tz) {
+    const guess = Date.UTC(y, mo - 1, d, h, mi);
+    const off1 = tzOffsetMs(new Date(guess), tz);
+    const off2 = tzOffsetMs(new Date(guess - off1), tz);
+    return new Date(guess - off2);
+  }
+  function utcToWallStr(utcDate, tz) {
+    const p = tzParts(utcDate, tz);
+    const pad = n => String(n).padStart(2, '0');
+    return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`;
+  }
+  function utcToDateStr(utcDate, tz) {
+    const p = tzParts(utcDate, tz);
+    const pad = n => String(n).padStart(2, '0');
+    return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
+  }
+  function utcToTimeStr(utcDate, tz) {
+    const p = tzParts(utcDate, tz);
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(p.hour)}:${pad(p.minute)}`;
+  }
+  function utcToDow(utcDate, tz) {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, weekday: 'short',
+    }).format(utcDate);
+  }
+  function timeSelectHtml(slotKey, tzKey, hour, minute) {
+    const pad = n => String(n).padStart(2, '0');
+    const hours = Array.from({ length: 24 }, (_, i) => pad(i));
+    const mins = Array.from({ length: 12 }, (_, i) => pad(i * 5));
+    const hOpts = hours.map(h => `<option value="${h}" ${h === pad(hour) ? 'selected' : ''}>${h}</option>`).join('');
+    const mOpts = mins.map(m => `<option value="${m}" ${m === pad(minute) ? 'selected' : ''}>${m}</option>`).join('');
+    return `
+      <span class="time-group">
+        <select class="time-select" data-input="${slotKey}" data-tz="${tzKey}" data-part="hour">${hOpts}</select>
+        <span class="time-sep">:</span>
+        <select class="time-select" data-input="${slotKey}" data-tz="${tzKey}" data-part="minute">${mOpts}</select>
+      </span>
+    `;
+  }
+  function parseWall(str) {
+    if (!str) return null;
+    const [d, t] = str.split('T');
+    const [y, mo, day] = d.split('-').map(Number);
+    const [h, mi] = t.split(':').map(Number);
+    return { y, mo, d: day, h, mi };
+  }
+  function parseDateTime(dateStr, timeStr) {
+    if (!dateStr || !timeStr) return null;
+    const [y, mo, day] = dateStr.split('-').map(Number);
+    const [h, mi] = timeStr.split(':').map(Number);
+    return { y, mo, d: day, h, mi };
+  }
+  function fmtDisplay(utcDate, tz) {
+    return new Intl.DateTimeFormat('ko-KR', {
+      timeZone: tz,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(utcDate);
+  }
+  function isSchoolBlock(utcDate) {
+    const p = tzParts(utcDate, NY_TZ);
+    const nyAsUtc = new Date(Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute));
+    const dow = nyAsUtc.getUTCDay();
+    const isWeekday = dow >= 1 && dow <= 5;
+    const s = parseInt(schoolStart.value, 10);
+    const e = parseInt(schoolEnd.value, 10);
+    return isWeekday && p.hour >= s && p.hour < e;
+  }
+  function icsDate(utcDate) {
+    const pad = n => String(n).padStart(2, '0');
+    return `${utcDate.getUTCFullYear()}${pad(utcDate.getUTCMonth() + 1)}${pad(utcDate.getUTCDate())}T${pad(utcDate.getUTCHours())}${pad(utcDate.getUTCMinutes())}00Z`;
+  }
+  function icsEscape(s) {
+    return String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+  }
+  function buildVevent(title, startUtc, durationMin, description) {
+    const endUtc = new Date(startUtc.getTime() + durationMin * 60 * 1000);
+    const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@kbbk`;
+    const now = icsDate(new Date());
+    return [
+      'BEGIN:VEVENT',
+      `UID:${uid}`, `DTSTAMP:${now}`,
+      `DTSTART:${icsDate(startUtc)}`, `DTEND:${icsDate(endUtc)}`,
+      `SUMMARY:${icsEscape(title)}`, `DESCRIPTION:${icsEscape(description)}`,
+      'END:VEVENT',
+    ].join('\r\n');
+  }
+
+  function buildIcs(vevents) {
+    return [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//KBBK Schedule//KR',
+      'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+      ...vevents,
+      'END:VCALENDAR',
+    ].join('\r\n');
+  }
+
+  function openIcsInCalendar(ics) {
+    // localhost + server.py: /ics 엔드포인트로 inline 서빙 → Safari에서 캘린더 자동 오픈
+    // 그 외 (GitHub Pages 등): Blob URL로 .ics 다운로드 → iOS는 탭 시 캘린더 자동 오픈
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+      const url = '/ics?ics=' + encodeURIComponent(ics);
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      setTimeout(() => document.body.removeChild(iframe), 4000);
+    } else {
+      const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'kbbk-event.ics';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  }
+
+  function openIcs(title, startUtc, durationMin, description) {
+    const ics = buildIcs([buildVevent(title, startUtc, durationMin, description)]);
+    openIcsInCalendar(ics);
+  }
+
+  function openIcsAll() {
+    const events = [];
+    SLOTS.forEach(slot => {
+      const dt = getDt(slot);
+      if (!dt) return;
+      const label = slotLabels[slot];
+      const title = projectName ? `[${projectName}] ${label}` : label;
+      const desc = `KST: ${fmtDisplay(dt, KST_TZ)}\nNY: ${fmtDisplay(dt, NY_TZ)}`;
+      events.push(buildVevent(title, dt, 60, desc));
+    });
+    if (events.length === 0) {
+      alert('등록할 시간이 아직 없어요. 슬롯에 시간부터 입력해주세요.');
+      return;
+    }
+    openIcsInCalendar(buildIcs(events));
+  }
+
+  const SLOTS = ['slot1', 'slot2', 'proposal'];
+  const FIXED_LABELS = { proposal: 'Proposal' };
+
+  let projectName = localStorage.getItem('kbbk-project') || '';
+  projectInput.value = projectName;
+
+  const savedLabel1 = localStorage.getItem('kbbk-label-slot1');
+  const savedLabel2 = localStorage.getItem('kbbk-label-slot2');
+  const LEGACY_MAP = { '카피 전달': 'Copy', '그림 전달': 'Art', '최종 전달': 'Final' };
+  let slotLabels = {
+    slot1: LEGACY_MAP[savedLabel1] || savedLabel1 || 'Copy',
+    slot2: LEGACY_MAP[savedLabel2] || savedLabel2 || 'Art',
+    proposal: 'Proposal',
+  };
+  let slotUtc = {
+    slot1: localStorage.getItem('kbbk-utc-slot1') || '',
+    slot2: localStorage.getItem('kbbk-utc-slot2') || '',
+    proposal: localStorage.getItem('kbbk-utc-proposal') || '',
+  };
+
+  function getDt(slot) { return slotUtc[slot] ? new Date(slotUtc[slot]) : null; }
+  function setDt(slot, dt) {
+    slotUtc[slot] = dt ? dt.toISOString() : '';
+    localStorage.setItem('kbbk-utc-' + slot, slotUtc[slot]);
+    updateHash();
+  }
+
+  function encodeState() {
+    const state = {
+      p: projectName,
+      l: [slotLabels.slot1, slotLabels.slot2],
+      t: [slotUtc.slot1, slotUtc.slot2, slotUtc.proposal],
+      s: schoolStart.value + '-' + schoolEnd.value,
+    };
+    return btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+  }
+
+  function decodeState(hash) {
+    try {
+      return JSON.parse(decodeURIComponent(escape(atob(hash))));
+    } catch (e) { return null; }
+  }
+
+  function updateHash() {
+    try {
+      history.replaceState(null, '', '#' + encodeState());
+    } catch (e) {}
+  }
+
+  function applySharedState(shared) {
+    if (!shared) return;
+    if (typeof shared.p === 'string') {
+      projectName = shared.p;
+      projectInput.value = projectName;
+      localStorage.setItem('kbbk-project', projectName);
+    }
+    if (Array.isArray(shared.l)) {
+      if (shared.l[0]) { slotLabels.slot1 = shared.l[0]; localStorage.setItem('kbbk-label-slot1', shared.l[0]); }
+      if (shared.l[1]) { slotLabels.slot2 = shared.l[1]; localStorage.setItem('kbbk-label-slot2', shared.l[1]); }
+    }
+    if (Array.isArray(shared.t)) {
+      const keys = ['slot1', 'slot2', 'proposal'];
+      keys.forEach((k, i) => {
+        slotUtc[k] = shared.t[i] || '';
+        localStorage.setItem('kbbk-utc-' + k, slotUtc[k]);
+      });
+    }
+    if (shared.s) {
+      const [ss, se] = shared.s.split('-');
+      if (ss) { schoolStart.value = ss; localStorage.setItem('kbbk-schoolStart', ss); }
+      if (se) { schoolEnd.value = se; localStorage.setItem('kbbk-schoolEnd', se); }
+    }
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(showToast._to);
+    showToast._to = setTimeout(() => t.classList.remove('show'), 1800);
+  }
+
+  function toggleHtml(slotKey, current) {
+    return `<div class="toggle" data-slot="${slotKey}">${DELIVERY_TYPES.map(t => `<button type="button" class="${t === current ? 'active' : ''}" data-value="${t}">${t}</button>`).join('')}</div>`;
+  }
+
+  function slotBlock(slotKey) {
+    const label = slotLabels[slotKey];
+    const isFixed = !!FIXED_LABELS[slotKey];
+    const dt = getDt(slotKey);
+    const isGrim = label === 'Art';
+    const badge = (dt && isGrim && isSchoolBlock(dt)) ? '<div><span class="warn">학교 겹침</span></div>' : '';
+    const kstText = dt ? formatTrigger(dt, KST_TZ) : 'Set time';
+    const nyText = dt ? formatTrigger(dt, NY_TZ) : 'Set time';
+    const headLeft = isFixed ? `<span class="fixed-label">${label}</span>` : toggleHtml(slotKey, label);
+    return `
+      <div class="slot">
+        <div class="slot-head">
+          ${headLeft}
+          <button class="cal-btn ${dt ? '' : 'disabled'}" data-cal="${slotKey}" title="애플 캘린더에 추가" aria-label="애플 캘린더에 추가">
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2.5" y="3.5" width="15" height="14" rx="2"/>
+              <line x1="2.5" y1="7.5" x2="17.5" y2="7.5"/>
+              <line x1="6.5" y1="2" x2="6.5" y2="5"/>
+              <line x1="13.5" y1="2" x2="13.5" y2="5"/>
+              <line x1="10" y1="10.5" x2="10" y2="14.5"/>
+              <line x1="8" y1="12.5" x2="12" y2="12.5"/>
+            </svg>
+          </button>
+        </div>
+        ${badge}
+        <div class="tz-row">
+          <span class="flag">KST</span>
+          <button type="button" class="dt-trigger ${dt ? '' : 'empty'}" data-input="${slotKey}" data-tz="KST">${kstText}</button>
+        </div>
+        <div class="tz-row">
+          <span class="flag">NY</span>
+          <button type="button" class="dt-trigger ${dt ? '' : 'empty'}" data-input="${slotKey}" data-tz="NY">${nyText}</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function formatTrigger(utcDate, tz) {
+    // "Mon, Aug 25 · 20:09"
+    const dow = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(utcDate);
+    const mon = new Intl.DateTimeFormat('en-US', { timeZone: tz, month: 'short' }).format(utcDate);
+    const p = tzParts(utcDate, tz);
+    const pad = n => String(n).padStart(2, '0');
+    return `${dow}, ${mon} ${p.day} · ${pad(p.hour)}:${pad(p.minute)}`;
+  }
+
+  function render() {
+    slotsEl.innerHTML = SLOTS.map(slotBlock).join('');
+    slotsEl.querySelectorAll('.toggle').forEach(tg => {
+      const slot = tg.dataset.slot;
+      tg.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          slotLabels[slot] = btn.dataset.value;
+          localStorage.setItem('kbbk-label-' + slot, btn.dataset.value);
+          updateHash();
+          render();
+        });
+      });
+    });
+    slotsEl.querySelectorAll('.dt-trigger').forEach(btn => {
+      btn.addEventListener('click', () => {
+        openPicker(btn);
+      });
+    });
+    slotsEl.querySelectorAll('button[data-cal]').forEach(btn => {
+      const slot = btn.dataset.cal;
+      btn.addEventListener('click', () => {
+        const dt = getDt(slot);
+        if (!dt) return;
+        const label = slotLabels[slot];
+        const title = projectName ? `[${projectName}] ${label}` : label;
+        const desc = `KST: ${fmtDisplay(dt, KST_TZ)}\nNY: ${fmtDisplay(dt, NY_TZ)}`;
+        openIcs(title, dt, 60, desc);
+      });
+    });
+  }
+
+  projectInput.addEventListener('input', () => {
+    projectName = projectInput.value;
+    localStorage.setItem('kbbk-project', projectName);
+    updateHash();
+  });
+
+  document.getElementById('addAllBtn').addEventListener('click', openIcsAll);
+
+  document.getElementById('shareBtn').addEventListener('click', async () => {
+    const url = location.origin + location.pathname + '#' + encodeState();
+    const shareData = { title: 'KBBK Schedule', url };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        showToast('링크 복사됨');
+      } else {
+        prompt('링크를 복사하세요:', url);
+      }
+    } catch (e) {
+      // 사용자가 공유 취소한 경우 무시
+    }
+  });
+
+  [schoolStart, schoolEnd].forEach(el => {
+    el.addEventListener('input', render);
+    el.addEventListener('change', () => {
+      localStorage.setItem('kbbk-' + el.id, el.value);
+      updateHash();
+    });
+  });
+  ['schoolStart', 'schoolEnd'].forEach(id => {
+    const saved = localStorage.getItem('kbbk-' + id);
+    if (saved) document.getElementById(id).value = saved;
+  });
+
+  // URL 해시가 있으면 공유된 상태 복원 (localStorage보다 우선)
+  if (location.hash.length > 1) {
+    const shared = decodeState(location.hash.slice(1));
+    applySharedState(shared);
+  }
+
+  render();
+
+  const cardEl = document.querySelector('.card');
+  cardEl.addEventListener('mousemove', e => {
+    const rect = cardEl.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    cardEl.style.setProperty('--mx', x + '%');
+    cardEl.style.setProperty('--my', y + '%');
+  });
+
+  // ===== Custom datetime picker =====
+  const picker = document.getElementById('dtPicker');
+  const dtTitle = document.getElementById('dtTitle');
+  const dtDays = document.getElementById('dtDays');
+  const dtHour = document.getElementById('dtHour');
+  const dtMinute = document.getElementById('dtMinute');
+  const dtPrev = document.getElementById('dtPrev');
+  const dtNext = document.getElementById('dtNext');
+  const dtClear = document.getElementById('dtClear');
+  const dtCancel = document.getElementById('dtCancel');
+  const dtDone = document.getElementById('dtDone');
+
+  const pickerState = {
+    slot: null,
+    tz: null,
+    viewYear: null,
+    viewMonth: null,  // 0-11
+    selDay: null,
+    hour: 0,
+    minute: 0,
+  };
+
+  // hour + minute options
+  for (let h = 0; h < 24; h++) {
+    const opt = document.createElement('option');
+    opt.value = h;
+    opt.textContent = String(h).padStart(2, '0');
+    dtHour.appendChild(opt);
+  }
+  for (let m = 0; m < 60; m += 5) {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = String(m).padStart(2, '0');
+    dtMinute.appendChild(opt);
+  }
+
+  function openPicker(btn) {
+    const slot = btn.dataset.input;
+    const tz = btn.dataset.tz === 'KST' ? KST_TZ : NY_TZ;
+    const dt = getDt(slot);
+    let year, month, day, hour, minute;
+    if (dt) {
+      const p = tzParts(dt, tz);
+      year = p.year; month = p.month - 1; day = p.day;
+      hour = p.hour; minute = Math.round(p.minute / 5) * 5;
+    } else {
+      const now = new Date();
+      const p = tzParts(now, tz);
+      year = p.year; month = p.month - 1; day = p.day;
+      hour = 9; minute = 0;
+    }
+    pickerState.slot = slot;
+    pickerState.tz = tz;
+    pickerState.viewYear = year;
+    pickerState.viewMonth = month;
+    pickerState.selDay = day;
+    pickerState.selYear = year;
+    pickerState.selMonth = month;
+    pickerState.hour = hour;
+    pickerState.minute = minute;
+    dtHour.value = String(hour);
+    dtMinute.value = String(minute);
+    renderPicker();
+    positionPicker(btn);
+    picker.hidden = false;
+  }
+
+  function positionPicker(btn) {
+    const rect = btn.getBoundingClientRect();
+    const pw = 240;
+    const ph = 320;
+    let top = rect.bottom + 6;
+    let left = rect.left;
+    if (top + ph > window.innerHeight) top = Math.max(8, rect.top - ph - 6);
+    if (left + pw > window.innerWidth) left = window.innerWidth - pw - 8;
+    if (left < 8) left = 8;
+    picker.style.top = top + 'px';
+    picker.style.left = left + 'px';
+  }
+
+  function renderPicker() {
+    const { viewYear, viewMonth, selYear, selMonth, selDay } = pickerState;
+    const monName = new Date(viewYear, viewMonth, 1).toLocaleString('en-US', { month: 'long' });
+    dtTitle.textContent = `${monName} ${viewYear}`;
+
+    const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const daysInPrev = new Date(viewYear, viewMonth, 0).getDate();
+    const today = new Date();
+    const todayY = today.getFullYear(), todayM = today.getMonth(), todayD = today.getDate();
+
+    let html = '';
+    for (let i = firstDow - 1; i >= 0; i--) {
+      html += `<button class="dt-day other" disabled>${daysInPrev - i}</button>`;
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const isSel = (viewYear === selYear && viewMonth === selMonth && d === selDay);
+      const isToday = (viewYear === todayY && viewMonth === todayM && d === todayD);
+      html += `<button class="dt-day ${isSel ? 'selected' : ''} ${isToday ? 'today' : ''}" data-day="${d}">${d}</button>`;
+    }
+    const filled = firstDow + daysInMonth;
+    const remain = (7 - (filled % 7)) % 7;
+    for (let i = 1; i <= remain; i++) {
+      html += `<button class="dt-day other" disabled>${i}</button>`;
+    }
+    dtDays.innerHTML = html;
+    dtDays.querySelectorAll('.dt-day:not(.other)').forEach(el => {
+      el.addEventListener('click', () => {
+        pickerState.selYear = pickerState.viewYear;
+        pickerState.selMonth = pickerState.viewMonth;
+        pickerState.selDay = parseInt(el.dataset.day, 10);
+        renderPicker();
+      });
+    });
+  }
+
+  dtPrev.addEventListener('click', () => {
+    pickerState.viewMonth--;
+    if (pickerState.viewMonth < 0) { pickerState.viewMonth = 11; pickerState.viewYear--; }
+    renderPicker();
+  });
+  dtNext.addEventListener('click', () => {
+    pickerState.viewMonth++;
+    if (pickerState.viewMonth > 11) { pickerState.viewMonth = 0; pickerState.viewYear++; }
+    renderPicker();
+  });
+  dtHour.addEventListener('change', () => { pickerState.hour = parseInt(dtHour.value, 10); });
+  dtMinute.addEventListener('change', () => { pickerState.minute = parseInt(dtMinute.value, 10); });
+
+  dtDone.addEventListener('click', () => {
+    const { slot, tz, selYear, selMonth, selDay, hour, minute } = pickerState;
+    const utcDt = wallToUtc(selYear, selMonth + 1, selDay, hour, minute, tz);
+    setDt(slot, utcDt);
+    picker.hidden = true;
+    render();
+  });
+  dtCancel.addEventListener('click', () => { picker.hidden = true; });
+  dtClear.addEventListener('click', () => {
+    setDt(pickerState.slot, null);
+    picker.hidden = true;
+    render();
+  });
+
+  // Close picker on outside click
+  document.addEventListener('click', (e) => {
+    if (picker.hidden) return;
+    if (picker.contains(e.target)) return;
+    if (e.target.classList && e.target.classList.contains('dt-trigger')) return;
+    picker.hidden = true;
+  });
+</script>
+</body>
+</html>
