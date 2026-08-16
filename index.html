@@ -632,19 +632,17 @@
   }
 
   function openIcsInCalendar(ics) {
-    // localhost + server.py: /ics 엔드포인트로 inline 서빙 → Safari에서 캘린더 자동 오픈
-    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-      const url = '/ics?ics=' + encodeURIComponent(ics);
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = url;
-      document.body.appendChild(iframe);
-      setTimeout(() => document.body.removeChild(iframe), 4000);
-      return;
-    }
-    // 프로덕션: data URI를 새 탭에서 오픈 → Safari가 text/calendar 감지 후 캘린더 앱으로 넘김
-    const dataUri = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
-    window.open(dataUri, '_blank');
+    // 로컬 (server.py): /ics 엔드포인트가 inline으로 서빙
+    // 프로덕션 (Vercel): /api/ics serverless 함수가 inline으로 서빙
+    // → 두 경우 모두 Safari(iOS/macOS)가 캘린더 앱을 바로 오픈
+    const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    const endpoint = isLocal ? '/ics' : '/api/ics';
+    const url = endpoint + '?ics=' + encodeURIComponent(ics);
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    setTimeout(() => document.body.removeChild(iframe), 4000);
   }
 
   function openIcs(title, startUtc, durationMin, description) {
@@ -1017,7 +1015,10 @@
   dtMinute.addEventListener('change', () => { pickerState.minute = parseInt(dtMinute.value, 10); });
 
   dtDone.addEventListener('click', () => {
-    const { slot, tz, selYear, selMonth, selDay, hour, minute } = pickerState;
+    const { slot, tz, selYear, selMonth, selDay } = pickerState;
+    // change 이벤트가 안 잡히는 브라우저 대비 — Done 시점에 select 값 직접 읽기
+    const hour = parseInt(dtHour.value, 10);
+    const minute = parseInt(dtMinute.value, 10);
     const utcDt = wallToUtc(selYear, selMonth + 1, selDay, hour, minute, tz);
     setDt(slot, utcDt);
     picker.hidden = true;
