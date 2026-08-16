@@ -642,14 +642,9 @@
       setTimeout(() => document.body.removeChild(iframe), 4000);
       return;
     }
-    // 프로덕션 (GitHub Pages): data URI를 hidden iframe으로 로드
-    // → Safari (macOS/iOS)가 text/calendar 감지 후 캘린더 앱을 바로 오픈 (다운로드 대신)
+    // 프로덕션: data URI를 새 탭에서 오픈 → Safari가 text/calendar 감지 후 캘린더 앱으로 넘김
     const dataUri = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = dataUri;
-    document.body.appendChild(iframe);
-    setTimeout(() => document.body.removeChild(iframe), 4000);
+    window.open(dataUri, '_blank');
   }
 
   function openIcs(title, startUtc, durationMin, description) {
@@ -1035,13 +1030,19 @@
     render();
   });
 
-  // Close picker on outside click
-  document.addEventListener('click', (e) => {
+  // Close picker on outside mousedown (mousedown fires before any DOM change from click handlers)
+  document.addEventListener('mousedown', (e) => {
     if (picker.hidden) return;
     if (picker.contains(e.target)) return;
-    if (e.target.classList && e.target.classList.contains('dt-trigger')) return;
+    if (e.target.closest && e.target.closest('.dt-trigger')) return;
     picker.hidden = true;
   });
+  document.addEventListener('touchstart', (e) => {
+    if (picker.hidden) return;
+    if (picker.contains(e.target)) return;
+    if (e.target.closest && e.target.closest('.dt-trigger')) return;
+    picker.hidden = true;
+  }, { passive: true });
 </script>
 </body>
 </html>
