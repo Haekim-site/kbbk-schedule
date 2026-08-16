@@ -502,24 +502,6 @@
 </div>
 
 <script>
-  // 카카오톡/인스타/페이스북/라인 등 인앱 브라우저 감지 → 외부 브라우저(Safari)로 자동 오픈
-  // 이유: 인앱 브라우저는 캘린더 앱 등 외부 앱 실행이 막혀있음
-  (function openInExternalBrowser() {
-    const ua = navigator.userAgent || '';
-    const url = location.href;
-    if (/KAKAOTALK/i.test(ua)) {
-      location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
-    } else if (/Instagram|FBAN|FBAV|Line/i.test(ua)) {
-      // iOS: 상단 우측 [...] → "Safari로 열기" 안내 배너 표시
-      window.addEventListener('DOMContentLoaded', () => {
-        const banner = document.createElement('div');
-        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#000;color:#fff;padding:10px 14px;font-size:12px;text-align:center;z-index:9999;font-family:-apple-system,sans-serif';
-        banner.textContent = '캘린더 등록을 위해 Safari에서 열어주세요. (우측 상단 ⋯ → Safari로 열기)';
-        document.body.appendChild(banner);
-      });
-    }
-  })();
-
   const slotsEl = document.getElementById('slots');
   const projectInput = document.getElementById('projectName');
   const schoolStart = document.getElementById('schoolStart');
@@ -627,45 +609,20 @@
   function icsEscape(s) {
     return String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
   }
-  function buildVevent(title, startUtc, durationMin, description) {
+  function gcalUrl(title, startUtc, durationMin, description) {
     const endUtc = new Date(startUtc.getTime() + durationMin * 60 * 1000);
-    const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@kbbk`;
-    const now = icsDate(new Date());
-    return [
-      'BEGIN:VEVENT',
-      `UID:${uid}`, `DTSTAMP:${now}`,
-      `DTSTART:${icsDate(startUtc)}`, `DTEND:${icsDate(endUtc)}`,
-      `SUMMARY:${icsEscape(title)}`, `DESCRIPTION:${icsEscape(description)}`,
-      'END:VEVENT',
-    ].join('\r\n');
-  }
-
-  function buildIcs(vevents) {
-    return [
-      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//KBBK Schedule//KR',
-      'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
-      ...vevents,
-      'END:VCALENDAR',
-    ].join('\r\n');
-  }
-
-  function openIcsInCalendar(ics) {
-    // 로컬 (server.py): /ics 엔드포인트가 inline으로 서빙
-    // 프로덕션 (Vercel): /api/ics serverless 함수가 inline으로 서빙
-    // → 두 경우 모두 Safari(iOS/macOS)가 캘린더 앱을 바로 오픈
-    const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-    const endpoint = isLocal ? '/ics' : '/api/ics';
-    const url = endpoint + '?ics=' + encodeURIComponent(ics);
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = url;
-    document.body.appendChild(iframe);
-    setTimeout(() => document.body.removeChild(iframe), 4000);
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: title,
+      dates: `${icsDate(startUtc)}/${icsDate(endUtc)}`,
+      details: description,
+    });
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
   }
 
   function openIcs(title, startUtc, durationMin, description) {
-    const ics = buildIcs([buildVevent(title, startUtc, durationMin, description)]);
-    openIcsInCalendar(ics);
+    // 구글 캘린더 이벤트 생성 URL을 새 탭에서 오픈 → Google Calendar (웹/앱) 에서 이벤트 추가 대화상자
+    window.open(gcalUrl(title, startUtc, durationMin, description), '_blank');
   }
 
   function openIcsAll() {
@@ -676,13 +633,18 @@
       const label = slotLabels[slot];
       const title = projectName ? `[${projectName}] ${label}` : label;
       const desc = `KST: ${fmtDisplay(dt, KST_TZ)}\nNY: ${fmtDisplay(dt, NY_TZ)}`;
-      events.push(buildVevent(title, dt, 60, desc));
+      events.push({ title, dt, desc });
     });
     if (events.length === 0) {
       alert('등록할 시간이 아직 없어요. 슬롯에 시간부터 입력해주세요.');
       return;
     }
-    openIcsInCalendar(buildIcs(events));
+    // 여러 이벤트를 순차적으로 오픈 (팝업 차단 회피 위해 짧은 딜레이)
+    events.forEach((ev, i) => {
+      setTimeout(() => {
+        window.open(gcalUrl(ev.title, ev.dt, 60, ev.desc), '_blank');
+      }, i * 400);
+    });
   }
 
   const SLOTS = ['slot1', 'slot2', 'proposal'];
