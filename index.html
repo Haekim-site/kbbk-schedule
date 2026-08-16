@@ -633,7 +633,6 @@
 
   function openIcsInCalendar(ics) {
     // localhost + server.py: /ics 엔드포인트로 inline 서빙 → Safari에서 캘린더 자동 오픈
-    // 그 외 (GitHub Pages 등): Blob URL로 .ics 다운로드 → iOS는 탭 시 캘린더 자동 오픈
     if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
       const url = '/ics?ics=' + encodeURIComponent(ics);
       const iframe = document.createElement('iframe');
@@ -641,17 +640,16 @@
       iframe.src = url;
       document.body.appendChild(iframe);
       setTimeout(() => document.body.removeChild(iframe), 4000);
-    } else {
-      const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'kbbk-event.ics';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return;
     }
+    // 프로덕션 (GitHub Pages): data URI를 hidden iframe으로 로드
+    // → Safari (macOS/iOS)가 text/calendar 감지 후 캘린더 앱을 바로 오픈 (다운로드 대신)
+    const dataUri = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = dataUri;
+    document.body.appendChild(iframe);
+    setTimeout(() => document.body.removeChild(iframe), 4000);
   }
 
   function openIcs(title, startUtc, durationMin, description) {
@@ -822,7 +820,8 @@
       });
     });
     slotsEl.querySelectorAll('.dt-trigger').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         openPicker(btn);
       });
     });
