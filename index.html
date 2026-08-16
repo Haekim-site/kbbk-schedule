@@ -436,6 +436,75 @@
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
+
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-backdrop[hidden] { display: none; }
+  .modal-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px;
+    width: 100%;
+    max-width: 320px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    font-family: -apple-system, sans-serif;
+  }
+  .modal-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 12px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .modal-list { display: flex; flex-direction: column; gap: 8px; }
+  .modal-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-size: 12px;
+  }
+  .modal-item-text { flex: 1; min-width: 0; }
+  .modal-item-title { font-weight: 600; color: var(--ink); }
+  .modal-item-time { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .modal-add {
+    background: var(--ink);
+    color: #fff;
+    border: none;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 5px;
+    cursor: pointer;
+    font-family: inherit;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .modal-add.done { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .modal-close {
+    margin-top: 12px;
+    width: 100%;
+    padding: 8px;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+  }
 </style>
 </head>
 <body>
@@ -476,6 +545,14 @@
   </div>
 </div>
 <div class="toast" id="toast"></div>
+
+<div class="modal-backdrop" id="modalBackdrop" hidden>
+  <div class="modal-card">
+    <div class="modal-title">Add to Google Calendar</div>
+    <div class="modal-list" id="modalList"></div>
+    <button type="button" class="modal-close" id="modalClose">닫기</button>
+  </div>
+</div>
 
 <div class="dt-picker" id="dtPicker" hidden>
   <div class="dt-cal-head">
@@ -633,17 +710,34 @@
       const label = slotLabels[slot];
       const title = projectName ? `[${projectName}] ${label}` : label;
       const desc = `KST: ${fmtDisplay(dt, KST_TZ)}\nNY: ${fmtDisplay(dt, NY_TZ)}`;
-      events.push({ title, dt, desc });
+      events.push({ title, dt, desc, label });
     });
     if (events.length === 0) {
       alert('등록할 시간이 아직 없어요. 슬롯에 시간부터 입력해주세요.');
       return;
     }
-    // 여러 이벤트를 순차적으로 오픈 (팝업 차단 회피 위해 짧은 딜레이)
-    events.forEach((ev, i) => {
-      setTimeout(() => {
-        window.open(gcalUrl(ev.title, ev.dt, 60, ev.desc), '_blank');
-      }, i * 400);
+    // 브라우저 팝업 차단 때문에 한번에 여러 탭 못 여는 걸 우회:
+    // 모달에 리스트 → 각 이벤트별로 사용자가 개별 클릭해 새 탭에서 등록
+    const list = document.getElementById('modalList');
+    const backdrop = document.getElementById('modalBackdrop');
+    list.innerHTML = events.map((ev, i) => {
+      const timeStr = fmtDisplay(ev.dt, KST_TZ) + ' KST';
+      const url = gcalUrl(ev.title, ev.dt, 60, ev.desc);
+      return `
+        <div class="modal-item">
+          <div class="modal-item-text">
+            <div class="modal-item-title">${ev.label}</div>
+            <div class="modal-item-time">${timeStr}</div>
+          </div>
+          <a class="modal-add" href="${url}" target="_blank" rel="noopener" data-idx="${i}">Add</a>
+        </div>
+      `;
+    }).join('');
+    backdrop.hidden = false;
+    list.querySelectorAll('.modal-add').forEach(a => {
+      a.addEventListener('click', () => {
+        setTimeout(() => a.classList.add('done'), 100);
+      });
     });
   }
 
@@ -818,6 +912,12 @@
   });
 
   document.getElementById('addAllBtn').addEventListener('click', openIcsAll);
+  document.getElementById('modalClose').addEventListener('click', () => {
+    document.getElementById('modalBackdrop').hidden = true;
+  });
+  document.getElementById('modalBackdrop').addEventListener('click', (e) => {
+    if (e.target.id === 'modalBackdrop') e.currentTarget.hidden = true;
+  });
 
   document.getElementById('shareBtn').addEventListener('click', async () => {
     const url = location.origin + location.pathname + '#' + encodeState();
