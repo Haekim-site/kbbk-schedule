@@ -502,6 +502,24 @@
 </div>
 
 <script>
+  // 카카오톡/인스타/페이스북/라인 등 인앱 브라우저 감지 → 외부 브라우저(Safari)로 자동 오픈
+  // 이유: 인앱 브라우저는 캘린더 앱 등 외부 앱 실행이 막혀있음
+  (function openInExternalBrowser() {
+    const ua = navigator.userAgent || '';
+    const url = location.href;
+    if (/KAKAOTALK/i.test(ua)) {
+      location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
+    } else if (/Instagram|FBAN|FBAV|Line/i.test(ua)) {
+      // iOS: 상단 우측 [...] → "Safari로 열기" 안내 배너 표시
+      window.addEventListener('DOMContentLoaded', () => {
+        const banner = document.createElement('div');
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#000;color:#fff;padding:10px 14px;font-size:12px;text-align:center;z-index:9999;font-family:-apple-system,sans-serif';
+        banner.textContent = '캘린더 등록을 위해 Safari에서 열어주세요. (우측 상단 ⋯ → Safari로 열기)';
+        document.body.appendChild(banner);
+      });
+    }
+  })();
+
   const slotsEl = document.getElementById('slots');
   const projectInput = document.getElementById('projectName');
   const schoolStart = document.getElementById('schoolStart');
